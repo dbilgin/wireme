@@ -154,7 +154,7 @@ def wg_add_peer(stdscr, conf_path: Path):
     net_str, server_vpn_ip = wg.iface_network_and_ip(cfg.get("Address") or "")
     if smart:
         route_default = f"{net_str or '10.0.0.0/24'}, {pub_ip + '/32' if pub_ip else 'PUBLIC_IP/32'}"
-        dns_default = "9.9.9.9"
+        dns_default = "1.1.1.1"
     else:
         route_default = f"{server_vpn_ip}/32" if server_vpn_ip else ""
         dns_default = ""
