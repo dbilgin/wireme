@@ -17,7 +17,7 @@
 - **ip** (for endpoint guessing)
 - **qrencode** (optional; only needed for QR rendering)
 
-## Install (system-wide)
+## Install (host)
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/dbilgin/wireme/master/install.sh | sudo bash
