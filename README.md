@@ -61,6 +61,5 @@ curl -fsSL https://raw.githubusercontent.com/dbilgin/wireme/master/install.sh | 
 ## Uninstall
 
 ```bash
-sudo rm -f /usr/local/bin/wireme
-sudo rm -rf /usr/local/lib/wireme
+curl -fsSL https://raw.githubusercontent.com/dbilgin/wireme/master/uninstall.sh | sudo bash
 ```
