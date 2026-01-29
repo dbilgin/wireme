@@ -1,173 +1,13 @@
 from __future__ import annotations
 
 import curses
-import textwrap
 import time
 from pathlib import Path
 
 from . import qr, util, wg
+from .ui import confirm_typed, draw_box, init_curses, menu, msg_any_key, prompt, draw_header
 
-HELP = "↑↓ move  •  Enter select  •  Esc/Backspace back  •  q quit"
-
-
-def init_curses(stdscr):
-    curses.curs_set(0)
-    curses.use_default_colors()
-    curses.start_color()
-    try:
-        curses.init_pair(1, curses.COLOR_CYAN, -1)  # title
-        curses.init_pair(2, curses.COLOR_GREEN, -1)  # ok
-        curses.init_pair(3, curses.COLOR_YELLOW, -1)  # warn
-        curses.init_pair(4, curses.COLOR_RED, -1)  # bad
-        curses.init_pair(5, curses.COLOR_WHITE, -1)  # normal
-    except Exception:
-        pass
-
-
-def draw_header(stdscr, title: str):
-    _h, w = stdscr.getmaxyx()
-    stdscr.attron(curses.color_pair(1) | curses.A_BOLD)
-    stdscr.addnstr(0, 0, f" wireme  •  {title}", w - 1)
-    stdscr.attroff(curses.color_pair(1) | curses.A_BOLD)
-
-    stdscr.attron(curses.A_DIM)
-    stdscr.addnstr(1, 0, " " * (w - 1), w - 1)
-    stdscr.addnstr(1, 2, HELP, w - 4)
-    stdscr.attroff(curses.A_DIM)
-
-
-def draw_box(stdscr, y: int, x: int, h: int, w: int, title: str | None = None):
-    if h < 3 or w < 4:
-        return
-    stdscr.attron(curses.A_DIM)
-    stdscr.addch(y, x, "┌")
-    stdscr.addch(y, x + w - 1, "┐")
-    stdscr.addch(y + h - 1, x, "└")
-    stdscr.addch(y + h - 1, x + w - 1, "┘")
-    for i in range(1, w - 1):
-        stdscr.addch(y, x + i, "─")
-        stdscr.addch(y + h - 1, x + i, "─")
-    for j in range(1, h - 1):
-        stdscr.addch(y + j, x, "│")
-        stdscr.addch(y + j, x + w - 1, "│")
-    stdscr.attroff(curses.A_DIM)
-
-    if title:
-        t = f" {title} "
-        stdscr.attron(curses.color_pair(1) | curses.A_BOLD)
-        stdscr.addnstr(y, x + 2, t, max(0, w - 4))
-        stdscr.attroff(curses.color_pair(1) | curses.A_BOLD)
-
-
-def wrap(text: str, width: int) -> list[str]:
-    out: list[str] = []
-    for ln in text.splitlines():
-        if not ln:
-            out.append("")
-            continue
-        out.extend(
-            textwrap.wrap(
-                ln,
-                width=width,
-                replace_whitespace=False,
-                drop_whitespace=False,
-            )
-            or [""]
-        )
-    return out
-
-
-def msg_any_key(stdscr, title: str, text: str):
-    while True:
-        stdscr.erase()
-        draw_header(stdscr, title)
-        h, w = stdscr.getmaxyx()
-        box_h = h - 4
-        box_w = w - 4
-        draw_box(stdscr, 2, 2, box_h, box_w, title="Message")
-        lines = wrap(text, max(20, box_w - 4))
-        max_body = box_h - 4
-        for i in range(min(max_body, len(lines))):
-            stdscr.addnstr(3 + i, 4, lines[i], box_w - 6)
-        stdscr.attron(curses.A_DIM)
-        stdscr.addnstr(h - 1, 2, "Press any key to continue", w - 4)
-        stdscr.attroff(curses.A_DIM)
-        stdscr.refresh()
-        stdscr.getch()
-        return
-
-
-def prompt(stdscr, prompt_text: str, default: str = "", secret: bool = False) -> str:
-    curses.curs_set(1)
-    h, w = stdscr.getmaxyx()
-    stdscr.attron(curses.A_REVERSE)
-    stdscr.addnstr(h - 1, 0, " " * (w - 1), w - 1)
-    msg = f"{prompt_text} "
-    stdscr.addnstr(h - 1, 0, msg, w - 1)
-    stdscr.attroff(curses.A_REVERSE)
-    stdscr.refresh()
-    if secret:
-        curses.noecho()
-    else:
-        curses.echo()
-    maxlen = max(1, w - len(msg) - 2)
-    try:
-        val = (
-            stdscr.getstr(h - 1, min(w - 2, len(msg)), maxlen)
-            .decode("utf-8", errors="replace")
-            .strip()
-        )
-    except Exception:
-        val = ""
-    curses.noecho()
-    curses.curs_set(0)
-    return val if val else default
-
-
-def confirm_typed(stdscr, title: str, text: str, expected: str) -> bool:
-    msg_any_key(stdscr, title, text + f"\n\nType exactly: {expected}")
-    typed = prompt(stdscr, "Confirm:", default="")
-    return typed == expected
-
-
-def menu(stdscr, title: str, items: list[str], subtitle: str | None = None):
-    idx = 0
-    while True:
-        stdscr.erase()
-        draw_header(stdscr, title)
-        h, w = stdscr.getmaxyx()
-        box_h = h - 4
-        box_w = w - 4
-        draw_box(stdscr, 2, 2, box_h, box_w, title=subtitle or "Select")
-
-        y0 = 4
-        max_items = box_h - 4
-        start = 0
-        if idx >= max_items:
-            start = idx - max_items + 1
-        vis = items[start : start + max_items]
-
-        for i, it in enumerate(vis):
-            y = y0 + i
-            if start + i == idx:
-                stdscr.attron(curses.A_REVERSE)
-                stdscr.addnstr(y, 4, it, box_w - 6)
-                stdscr.attroff(curses.A_REVERSE)
-            else:
-                stdscr.addnstr(y, 4, it, box_w - 6)
-
-        stdscr.refresh()
-        k = stdscr.getch()
-        if k == ord("q"):
-            return "quit", None
-        if k in (27, curses.KEY_BACKSPACE, 127):
-            return "back", None
-        if k in (curses.KEY_DOWN, ord("j")):
-            idx = min(len(items) - 1, idx + 1)
-        elif k in (curses.KEY_UP, ord("k")):
-            idx = max(0, idx - 1)
-        elif k in (curses.KEY_ENTER, 10, 13):
-            return "open", idx
+APP_NAME = "wireme"
 
 
 # ---------- Screens ----------
@@ -181,7 +21,7 @@ def iface_overview_screen(stdscr, conf_path: Path):
 
     while True:
         stdscr.erase()
-        draw_header(stdscr, f"{iface} • Overview")
+        draw_header(stdscr, APP_NAME, f"{iface} • Overview")
         h, w_ = stdscr.getmaxyx()
 
         draw_box(stdscr, 2, 2, 6, w_ - 4, title="Interface")
@@ -244,21 +84,21 @@ def iface_overview_screen(stdscr, conf_path: Path):
 def wg_show_qr_saved(stdscr, iface: str):
     base = wg.CLIENTS_DIR / iface
     if not base.exists():
-        msg_any_key(stdscr, "QR", f"No saved client configs at:\n{base}")
+        msg_any_key(stdscr, APP_NAME, "QR", f"No saved client configs at:\n{base}")
         return
     confs = sorted(base.glob("*.conf"))
     if not confs:
-        msg_any_key(stdscr, "QR", f"No *.conf in:\n{base}")
+        msg_any_key(stdscr, APP_NAME, "QR", f"No *.conf in:\n{base}")
         return
-    act, idx = menu(stdscr, f"{iface}", [c.name for c in confs] + ["Back"], subtitle="Show QR (saved configs)")
+    act, idx = menu(stdscr, APP_NAME, f"{iface}", [c.name for c in confs] + ["Back"], subtitle="Show QR (saved configs)")
     if act != "open" or idx == len(confs):
         return
     target = confs[idx]
     rc, out, err = qr.qr_from_text(util.read_text(target))
     if rc != 0 or not out:
-        msg_any_key(stdscr, "QR", f"QR failed:\n{err or out}")
+        msg_any_key(stdscr, APP_NAME, "QR", f"QR failed:\n{err or out}")
         return
-    msg_any_key(stdscr, f"QR • {iface}/{target.stem}", out)
+    msg_any_key(stdscr, APP_NAME, f"QR • {iface}/{target.stem}", out)
 
 
 def wg_add_peer(stdscr, conf_path: Path):
@@ -271,7 +111,7 @@ def wg_add_peer(stdscr, conf_path: Path):
     name_raw = prompt(stdscr, "Peer name:", default="")
     name = util.sanitize_name(name_raw)
     if not name:
-        msg_any_key(stdscr, "Add peer", "Cancelled (invalid name).")
+        msg_any_key(stdscr, APP_NAME, "Add peer", "Cancelled (invalid name).")
         return
 
     suggested_ip = wg.next_free_client_ip(cfg.get("Address") or "", peers) or ""
@@ -281,29 +121,29 @@ def wg_add_peer(stdscr, conf_path: Path):
         default=suggested_ip,
     ).strip()
     if not client_ip:
-        msg_any_key(stdscr, "Add peer", "Cancelled (no IP).")
+        msg_any_key(stdscr, APP_NAME, "Add peer", "Cancelled (no IP).")
         return
     if "/" not in client_ip:
         client_ip = client_ip + "/32"
 
     rc, priv, err = util.run(["wg", "genkey"])
     if rc != 0 or not priv:
-        msg_any_key(stdscr, "Add peer", f"wg genkey failed:\n{err}")
+        msg_any_key(stdscr, APP_NAME, "Add peer", f"wg genkey failed:\n{err}")
         return
     pub = wg.pubkey_from_priv(priv)
     if not pub:
-        msg_any_key(stdscr, "Add peer", "Failed to derive public key.")
+        msg_any_key(stdscr, APP_NAME, "Add peer", "Failed to derive public key.")
         return
     rc, psk, _ = util.run(["wg", "genpsk"])
     psk = psk.strip() if rc == 0 else ""
 
     s_priv = cfg.get("PrivateKey")
     if not s_priv:
-        msg_any_key(stdscr, "Add peer", "Interface PrivateKey not found in config.")
+        msg_any_key(stdscr, APP_NAME, "Add peer", "Interface PrivateKey not found in config.")
         return
     s_pub = wg.pubkey_from_priv(s_priv)
     if not s_pub:
-        msg_any_key(stdscr, "Add peer", "Failed to derive server public key.")
+        msg_any_key(stdscr, APP_NAME, "Add peer", "Failed to derive server public key.")
         return
 
     listen_port = (cfg.get("ListenPort") or "51820").strip()
@@ -366,21 +206,22 @@ def wg_add_peer(stdscr, conf_path: Path):
         if rc != 0:
             msg_any_key(
                 stdscr,
+                APP_NAME,
                 "Add peer",
                 f"Saved, but apply failed.\n\nBackup: {backup}\n\nError:\n{aerr}",
             )
         else:
-            msg_any_key(stdscr, "Add peer", f"Saved + applied.\n\nBackup: {backup}")
+            msg_any_key(stdscr, APP_NAME, "Add peer", f"Saved + applied.\n\nBackup: {backup}")
     else:
-        msg_any_key(stdscr, "Add peer", f"Saved (not applied).\n\nBackup: {backup}")
+        msg_any_key(stdscr, APP_NAME, "Add peer", f"Saved (not applied).\n\nBackup: {backup}")
 
     show_qr = prompt(stdscr, "Show QR now? (y/N):", default="n").lower().startswith("y")
     if show_qr:
         rc, out, qerr = qr.qr_from_text(client_text)
         if rc == 0 and out:
-            msg_any_key(stdscr, f"QR • {iface}/{name}", out)
+            msg_any_key(stdscr, APP_NAME, f"QR • {iface}/{name}", out)
         else:
-            msg_any_key(stdscr, "QR", f"QR failed:\n{qerr or out}")
+            msg_any_key(stdscr, APP_NAME, "QR", f"QR failed:\n{qerr or out}")
 
     save = prompt(stdscr, "Save client config on disk? (y/N):", default="n").lower().startswith("y")
     if save:
@@ -392,16 +233,16 @@ def wg_add_peer(stdscr, conf_path: Path):
             client_conf = client_dir / f"{name}--{fp}--{int(time.time())}.conf"
         client_conf.write_text(client_text)
         client_conf.chmod(0o600)
-        msg_any_key(stdscr, "Saved client config", f"Saved:\n{client_conf}")
+        msg_any_key(stdscr, APP_NAME, "Saved client config", f"Saved:\n{client_conf}")
     else:
-        msg_any_key(stdscr, "Client config not saved", "Not saved on disk.\n(You can re-run add and choose to save next time.)")
+        msg_any_key(stdscr, APP_NAME, "Client config not saved", "Not saved on disk.\n(You can re-run add and choose to save next time.)")
 
 
 def wg_delete_peer(stdscr, conf_path: Path):
     iface = conf_path.stem
     _, peers, raw_lines = wg.parse_conf(conf_path)
     if not peers:
-        msg_any_key(stdscr, "Delete peer", "No peers in config.")
+        msg_any_key(stdscr, APP_NAME, "Delete peer", "No peers in config.")
         return
 
     labels: list[str] = []
@@ -414,7 +255,7 @@ def wg_delete_peer(stdscr, conf_path: Path):
         fp = wg.pub_fingerprint(pub)
         labels.append(f"{name}  •  {aips}  •  {prof}  •  {created}  •  {fp}")
 
-    act, idx = menu(stdscr, f"{iface}", labels + ["Back"], subtitle="Delete peer")
+    act, idx = menu(stdscr, APP_NAME, f"{iface}", labels + ["Back"], subtitle="Delete peer")
     if act != "open" or idx == len(labels):
         return
     peer = peers[idx]
@@ -451,12 +292,13 @@ def wg_delete_peer(stdscr, conf_path: Path):
     confirm_str = f"delete {name}"
     ok = confirm_typed(
         stdscr,
+        APP_NAME,
         "Confirm delete",
         f"Remove peer from {conf_path}:\n\nName: {name}\nPublicKey: {pub}\nAllowedIPs: {aips}\n\nBackups will be created.{extra}",
         expected=confirm_str,
     )
     if not ok:
-        msg_any_key(stdscr, "Delete peer", "Cancelled.")
+        msg_any_key(stdscr, APP_NAME, "Delete peer", "Cancelled.")
         return
 
     backup = wg.backup(conf_path)
@@ -478,6 +320,7 @@ def wg_delete_peer(stdscr, conf_path: Path):
         if rc != 0:
             msg_any_key(
                 stdscr,
+                APP_NAME,
                 "Delete peer",
                 f"Removed from config, but apply failed.\n\nBackup: {backup}\n\nError:\n{aerr}",
             )
@@ -488,19 +331,19 @@ def wg_delete_peer(stdscr, conf_path: Path):
         msg += "\n\nDeleted matching client config(s):\n" + "\n".join(deleted_files)
     if delete_errors:
         msg += "\n\nFailed to delete some files:\n" + "\n".join(delete_errors)
-    msg_any_key(stdscr, "Delete peer", msg)
+    msg_any_key(stdscr, APP_NAME, "Delete peer", msg)
 
 
 def _main(stdscr):
     init_curses(stdscr)
 
     if not util.have("wg"):
-        msg_any_key(stdscr, "WireGuard", "wg not installed.")
+        msg_any_key(stdscr, APP_NAME, "WireGuard", "wg not installed.")
         return
 
     confs = wg.interfaces()
     if not confs:
-        msg_any_key(stdscr, "WireGuard", "No /etc/wireguard/*.conf found.")
+        msg_any_key(stdscr, APP_NAME, "WireGuard", "No /etc/wireguard/*.conf found.")
         return
 
     while True:
@@ -512,7 +355,7 @@ def _main(stdscr):
             items.append(f"{iface}  •  {status}  •  {c}")
         items.append("Quit")
 
-        act, idx = menu(stdscr, "WireGuard", items, subtitle=("root" if util.is_root() else "not root"))
+        act, idx = menu(stdscr, APP_NAME, "WireGuard", items, subtitle=("root" if util.is_root() else "not root"))
         if act in ("quit",):
             return
         if act == "open":
@@ -529,7 +372,7 @@ def _main(stdscr):
                     "Delete peer (typed confirmation + deletes matching saved config)",
                     "Back",
                 ]
-                act2, j = menu(stdscr, iface, choices, subtitle="Actions")
+                act2, j = menu(stdscr, APP_NAME, iface, choices, subtitle="Actions")
                 if act2 == "quit":
                     return
                 if act2 == "back":
@@ -539,14 +382,14 @@ def _main(stdscr):
                         iface_overview_screen(stdscr, conf_path)
                     elif j == 1:
                         if not util.is_root():
-                            msg_any_key(stdscr, "Add peer", "Run as root for add peer.")
+                            msg_any_key(stdscr, APP_NAME, "Add peer", "Run as root for add peer.")
                         else:
                             wg_add_peer(stdscr, conf_path)
                     elif j == 2:
                         wg_show_qr_saved(stdscr, iface)
                     elif j == 3:
                         if not util.is_root():
-                            msg_any_key(stdscr, "Delete peer", "Run as root for delete peer.")
+                            msg_any_key(stdscr, APP_NAME, "Delete peer", "Run as root for delete peer.")
                         else:
                             wg_delete_peer(stdscr, conf_path)
                     elif j == 4:

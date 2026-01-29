@@ -26,6 +26,10 @@ This installs:
 - `/usr/local/bin/wireme`
 - `/usr/local/lib/wireme/wireme/`
 
+Mutual exclusion:
+
+- If `wiremec` is already installed, `install.sh` will refuse to install `wireme`.
+
 ## Usage
 
 Run:
@@ -62,4 +66,45 @@ curl -fsSL https://raw.githubusercontent.com/dbilgin/wireme/master/install.sh | 
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/dbilgin/wireme/master/uninstall.sh | sudo bash
+```
+
+---
+
+## wiremec (client)
+
+`wiremec` is the client companion tool:
+
+- import a client WireGuard config
+- save it to `/etc/wireguard/<iface>.conf` (backup if exists)
+- bring the interface up/down via `wg-quick`
+- show status via `wg show`
+
+### Install (client)
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/dbilgin/wireme/master/installc.sh | sudo bash
+```
+
+Mutual exclusion:
+
+- If `wireme` is already installed, `installc.sh` will refuse to install `wiremec`.
+
+### Usage
+
+```bash
+wiremec
+```
+
+### Update (client)
+
+Re-run the installer:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/dbilgin/wireme/master/installc.sh | sudo bash
+```
+
+### Uninstall (client)
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/dbilgin/wireme/master/uninstallc.sh | sudo bash
 ```

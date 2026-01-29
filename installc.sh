@@ -7,15 +7,15 @@ BIN_DIR="${WIREME_BIN_DIR:-/usr/local/bin}"
 LIB_DIR="${WIREME_LIB_DIR:-/usr/local/lib/wireme}"
 
 say() { printf '%s\n' "$*"; }
-die() { say "wireme install: $*"; exit 1; }
+die() { say "wiremec install: $*"; exit 1; }
 big_abort_other_installed() {
   say ""
   say "============================================================"
-  say "ERROR: wiremec is already installed on this host."
+  say "ERROR: wireme is already installed on this host."
   say ""
-  say "This installer will NOT install wireme when wiremec exists."
+  say "This installer will NOT install wiremec when wireme exists."
   say ""
-  say "Uninstall wiremec first, then re-run this installer."
+  say "Uninstall wireme first, then re-run this installer."
   say "============================================================"
   say ""
   exit 2
@@ -27,8 +27,8 @@ if [[ "$(id -u)" -ne 0 ]]; then
   SUDO="sudo"
 fi
 
-# Mutual exclusion: refuse to install wireme if wiremec exists.
-if [[ -x "${BIN_DIR}/wiremec" ]]; then
+# Mutual exclusion: refuse to install wiremec if wireme exists.
+if [[ -x "${BIN_DIR}/wireme" ]]; then
   big_abort_other_installed
 fi
 
@@ -60,15 +60,14 @@ fi
 say "Extracting ..."
 tar -xzf "$archive" -C "$tmp"
 
-repo_name="${REPO##*/}"
 topdir="$(tar -tzf "$archive" | awk -F/ 'NR==1{print $1}')"
 src_root="${tmp}/${topdir}"
 
 [[ -d "$src_root/wireme" ]] || die "archive missing wireme/ package"
-[[ -f "$src_root/scripts/wireme" ]] || die "archive missing scripts/wireme launcher"
+[[ -f "$src_root/scripts/wiremec" ]] || die "archive missing scripts/wiremec launcher"
 
 say "Installing to:"
-say "  - ${BIN_DIR}/wireme"
+say "  - ${BIN_DIR}/wiremec"
 say "  - ${LIB_DIR}/wireme/"
 
 $SUDO install -d "$BIN_DIR"
@@ -76,8 +75,8 @@ $SUDO install -d "$LIB_DIR"
 
 # Replace installed package/launcher.
 $SUDO rm -rf "${LIB_DIR}/wireme"
-$SUDO install -m 0755 "$src_root/scripts/wireme" "${BIN_DIR}/wireme"
+$SUDO install -m 0755 "$src_root/scripts/wiremec" "${BIN_DIR}/wiremec"
 $SUDO cp -R "$src_root/wireme" "$LIB_DIR/"
 
 say ""
-say "Installed. Run: wireme"
+say "Installed. Run: wiremec"
